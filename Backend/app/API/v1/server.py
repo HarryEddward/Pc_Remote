@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 
 import pyautogui
@@ -11,6 +11,19 @@ app = FastAPI()
 async def move_mouse(x: int, y: int) -> None:
     pyautogui.moveTo(x, y)
 
+
+@app.websocket("/ws")
+async def root(websocket: WebSocket):
+
+    await websocket.accept()
+    
+    try:
+        while True:
+
+            data = await websocket.receive_text()
+            print(data)
+    except WebSocketDisconnect:
+        pass
 
 @app.websocket("/pointer")
 async def root(websocket: WebSocket):
@@ -31,12 +44,5 @@ async def root(websocket: WebSocket):
                 
                 asyncio.create_task(move_mouse(x, y))
 
-    except Exception as e:
-
-        print(f'error: {e}')
-        '''
-        En revision!
-        return JSONResponse({
-
-        }, )
-        '''
+    except WebSocketDisconnect:
+        pass
