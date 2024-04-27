@@ -1,78 +1,60 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
-
-import pyautogui
+import uvloop
 import asyncio
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import pyautogui
 
-
-app = FastAPI()
-
-
-
-from fastapi import FastAPI, WebSocket
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 app = FastAPI()
-
-# Almacenamiento temporal de conexiones de WebSocket
-websocket_connections = []
-
-
+websocket_connections = set()
+message_queue = asyncio.Queue(maxsize=100)
 
 async def move_mouse(x: int, y: int) -> None:
     pyautogui.moveTo(x, y)
 
+async def process_messages():
+    while True:
+        data_raw = await message_queue.get()
+        while not message_queue.empty():
+            data_raw = await message_queue.get()
+        x, y = map(int, data_raw.split(","))
+        await move_mouse(x, y)
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(process_messages())
 
 @app.get("/")
 async def root():
-    return "hola"
+    return "Hola"
 
-# Ruta de conexión WebSocket# Ruta de conexión WebSocket
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    websocket_connections.append(websocket)
+    websocket_connections.add(websocket)
     try:
         while True:
-            # Espera mensajes del cliente
             data_raw = await websocket.receive_text()
-            data = data_raw.split(", ")
-            
-            x = int(data[0])
-            y = int(data[1])
-            # Aquí deberías enviar los datos a todos los clientes, no solo imprimirlos
-            # Reenvía el mensaje a todos los clientes conectados
-            for connection in websocket_connections:
-                await connection.send_text(data_raw)
-            
-
-            if x is not None and y is not None:
-                
-                asyncio.create_task(move_mouse(x, y))
-
+            await message_queue.put(data_raw)
+    except WebSocketDisconnect:
+        pass
     finally:
-        # Elimina la conexión cuando se cierra
         websocket_connections.remove(websocket)
 
-
-'''
-@app.websocket("/pointer")
-async def root(websocket: WebSocket):
-
+@app.websocket("/click")
+async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    websocket_connections.add(websocket)
     try:
         while True:
-            
-            data_bytes = await websocket.receive_bytes()
-            data_str = data_bytes.decode()
-            
-            parts = data_str.split(",")
-
-            x = int(parts[0])
-            y = int(parts[0])
-
-            if x is not None and y is not None:
-                
-                asyncio.create_task(move_mouse(x, y))
-
+            data_raw = await websocket.receive_text()
+            if data_raw == "click":
+                pyautogui.click()
     except WebSocketDisconnect:
-        pass'''
+        pass
+    finally:
+        websocket_connections.remove(websocket)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="192.168.1.135", port=8010)

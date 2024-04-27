@@ -1,28 +1,30 @@
 import React, { useState, useEffect } from "react";
 
+
 function App() {
   const [message, setMessage] = useState("");
   const [receivedMessage, setReceivedMessage] = useState("");
   const [ws, setWs] = useState(null);
+  const [wsClick, setWsClick] = useState(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     // Establecer la conexión WebSocket
-    const socket = new WebSocket("ws://localhost:8000/ws");
+    const socketCoordenates = new WebSocket("ws://192.168.1.135:8010/ws");
 
     // Evento de apertura de la conexión WebSocket
-    socket.onopen = () => {
+    socketCoordenates.onopen = () => {
       console.log("WebSocket Connected");
-      setWs(socket);
+      setWs(socketCoordenates);
     };
 
     // Evento de recepción de mensajes
-    socket.onmessage = (event) => {
+    socketCoordenates.onmessage = (event) => {
       setReceivedMessage(event.data);
     };
 
     // Evento de cierre de la conexión WebSocket
-    socket.onclose = () => {
+    socketCoordenates.onclose = () => {
       console.log("WebSocket Disconnected");
       setWs(null);
     };
@@ -34,6 +36,52 @@ function App() {
       }
     };
   }, []); // Array vacío indica que el efecto se ejecuta solo una vez al montar el componente
+
+  useEffect(() => {
+    // Establecer la conexión WebSocket
+    const socketClick = new WebSocket("ws://192.168.1.135:8000/click");
+
+    // Evento de apertura de la conexión WebSocket
+    socketClick.onopen = () => {
+      console.log("WebSocket Connected");
+      setWsClick(socketClick);
+    };
+
+    // Evento de recepción de mensajes
+    socketClick.onmessage = (event) => {
+      setReceivedMessage(event.data);
+    };
+
+    // Evento de cierre de la conexión WebSocket
+    socketClick.onclose = () => {
+      console.log("WebSocket Disconnected");
+      setWsClick(null);
+    };
+
+    // Limpieza al desmontar el componente
+    return () => {
+      if (wsClick) {
+        wsClick.close();
+      }
+    };
+  }, [])
+
+  useEffect(() => {
+    const handleClick = () => {
+
+      if (wsClick) {
+        wsClick.send("click")
+      }
+    };
+
+    // Agregar el event listener al documento
+    document.addEventListener("click", handleClick);
+
+    // Limpiar el event listener al desmontar el componente
+    return () => {
+      document.removeEventListener("click", handleClick);
+    };
+  }, [wsClick]); // Se ejecuta solo una vez al montar el componente
 
   // Función para enviar mensajes
   const sendMessage = () => {
@@ -80,6 +128,9 @@ function App() {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
       />
+      <div>
+
+    </div>
       <button onClick={sendMessage}>Send</button>
       <p>Received message: {receivedMessage}</p>
     </div>
